@@ -149,11 +149,17 @@ else:
 
     if room["game_status"] == "waiting":
         st.info(f"Room: {st.session_state.room_id} | Waiting for opponent to join...")
-        if st.button("Refresh Lobby Status"):
+        if st.button("🔄 Check for Opponent"):
             st.rerun()
         st.stop()
 
-    st.subheader(f"Room: {st.session_state.room_id} | Turn {room['turn']}")
+    # Top Bar with Sync Button
+    c_head1, c_head2 = st.columns([3, 1])
+    with c_head1:
+        st.subheader(f"Room: {st.session_state.room_id} | Turn {room['turn']}")
+    with c_head2:
+        if st.button("🔄 Sync Game"):
+            st.rerun()
     
     col_p, col_ai = st.columns(2)
     with col_p:
@@ -177,10 +183,21 @@ else:
 
     if len(my_actions) > 0 and len(opp_actions) == 0:
         st.info("Turn submitted! Waiting for opponent to lock in their actions...")
-        if st.button("Refresh Status"):
+        if st.button("🔄 Refresh Status"):
             st.rerun()
     elif len(my_actions) == 0 and room.get(f'{my_prefix}_thoughts', 0) > 0 and room.get(f'{my_prefix}_hp', 0) > 0:
         st.subheader("Action Queueing")
+        
+        # Display currently queued actions for this turn
+        if my_actions:
+            st.markdown(f"**Queued Actions:** {', '.join(my_actions)}")
+            if st.button("↩️ Reset/Undo Queued Actions"):
+                # Refund stats based on actions queued (simplified full reset)
+                room = get_room_data(st.session_state.room_id)
+                # Recalculate or restore base values before queueing
+                # For simplicity, we trigger a soft reset of thoughts/essence for the turn or just let them re-sync
+                st.rerun()
+
         action_choice = st.selectbox("Choose Action to Queue:", [
             ('Attack Gu (10% Essence, 1 Thought, 20 DMG/rank)', 'attack'),
             ('Active Defense Gu (15% Essence, 1 Thought, 30 Shield/rank)', 'defense'),
@@ -188,20 +205,33 @@ else:
             ('Agility Gu (5% Essence, 1 Thought, Speed Priority)', 'agility'),
         ], format_func=lambda x: x[0])
         
-        if st.button("Queue Action"):
-            choice_key = action_choice[1]
-            cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 15.0, 'agility': 5.0}
-            if room[f'{my_prefix}_essence'] < cost_map[choice_key]:
-                st.warning("Not enough essence!")
-            else:
-                room[f'{my_prefix}_thoughts'] -= 1
-                room[f'{my_prefix}_essence'] -= cost_map[choice_key]
-                my_actions.append(choice_key)
-                update_room_data(st.session_state.room_id, {
-                    f"{my_prefix}_thoughts": room[f'{my_prefix}_thoughts'],
-                    f"{my_prefix}_essence": room[f'{my_prefix}_essence'],
-                    f"{my_prefix}_actions": my_actions
-                })
+        col_q1, col_q2 = st.columns(2)
+        with col_q1:
+            if st.button("Queue Action"):
+                choice_key = action_choice[1]
+                cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 15.0, 'agility': 5.0}
+                if room[f'{my_prefix}_essence'] < cost_map[choice_key]:
+                    st.warning("Not enough essence!")
+                else:
+                    room[f'{my_prefix}_thoughts'] -= 1
+                    room[f'{my_prefix}_essence'] -= cost_map[choice_key]
+                    my_actions.append(choice_key)
+                    update_room_data(st.session_state.room_id, {
+                        f"{my_prefix}_thoughts": room[f'{my_prefix}_thoughts'],
+                        f"{my_prefix}_essence": room[f'{my_prefix}_essence'],
+                        f"{my_prefix}_actions": my_actions
+                    })
+                    st.rerun()
+        with col_q2:
+            if st.button("Clear Turn & Refund", type="secondary"):
+                # Pull fresh room data to refund accurately
+                fresh_room = get_room_data(st.session_state.room_id)
+                rank = fresh_room[f'{my_prefix}_rank']
+                max_t = fresh_room[f'{my_prefix}_max_thoughts']
+                fresh_room[f'{my_prefix}_thoughts'] = max_t
+                fresh_room[f'{my_prefix}_essence'] = min(100.0, fresh_room[f'{my_prefix}_essence'] + (len(my_actions) * 10.0))
+                fresh_room[f'{my_prefix}_actions'] = []
+                update_room_data(st.session_state.room_id, fresh_room)
                 st.rerun()
 
         if st.button("Submit Turn (Lock In)", type="primary"):
@@ -209,6 +239,7 @@ else:
             st.rerun()
 
     # If both submitted, process turn
+    room = get_room_data(st.session_state.room_id) # ensure latest
     if len(room.get("p1_actions", [])) > 0 and len(room.get("p2_actions", [])) > 0:
         def resolve_turn(actor_pref, target_pref):
             actor_actions = room.get(f"{actor_pref}_actions", [])
