@@ -1,25 +1,350 @@
-# 🎈 Blank app template
+import random
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 
-A simple Streamlit app template for you to modify!
+class GuMaster:
+    def __init__(self, name, rank, aptitude, gu_counts):
+        self.name = name
+        self.rank = rank
+        self.aptitude = aptitude
+        self.gu_counts = gu_counts
+        
+        hp_map = {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}
+        self.max_hp = hp_map.get(rank, 200)
+        self.hp = self.max_hp
+        self.essence = 100.0
+        
+        thought_map = {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}
+        self.max_thoughts = thought_map.get(rank, 1)
+        self.thoughts = self.max_thoughts
+        
+        self.agility_active = False
+        self.active_defense = 0
+        self.queued_actions = []
+        self.turn_gu_uses = {}
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+    def reset_turn(self):
+        regen_rate = 25.0 if self.aptitude == "Extreme" else 12.0
+        self.essence = min(100.0, self.essence + regen_rate)
+        
+        thought_regen_map = {1: 1, 2: 2, 3: 2, 4: 2, 5: 3}
+        regen_thoughts = thought_regen_map.get(self.rank, 1)
+        self.thoughts = min(self.max_thoughts, self.thoughts + regen_thoughts)
+        
+        self.agility_active = False
+        self.active_defense = 0
+        self.queued_actions = []
+        self.turn_gu_uses = {}
 
-### How to run it on your own machine
+    def status_report(self):
+        loadout_str = ", ".join([f"{name} x{count}" for name, count in self.gu_counts.items() if count > 0])
+        if not loadout_str:
+            loadout_str = "None"
+        return f"**{self.name}** (Rank {self.rank} | {self.aptitude})\n* HP: {self.hp}/{self.max_hp} | Essence: {self.essence:.1f}% | Thoughts: {self.thoughts}/{self.max_thoughts}\n* Loadout: [{loadout_str}]"
 
-Prerequisite: install `uv` if you don't already have it.
 
-```
-$ curl -LsSf https://astral.sh/uv/install.sh | sh
-```
+def run_gu_shop_battle():
+    print("=== CONFIGURE GU MASTER DUEL ===")
+    
+    max_cap_map = {1: 2, 2: 4, 3: 6, 4: 8, 5: 10}
+    
+    # Player Config Widgets
+    p_name_w = widgets.Text(value="Gu Master A", description="Your Name:")
+    p_rank_w = widgets.IntSlider(value=3, min=1, max=5, description="Your Rank:")
+    p_apt_w = widgets.Dropdown(options=["Extreme", "A-Grade", "B-Grade", "C-Grade", "D-Grade"], value="Extreme", description="Aptitude:")
+    
+    p_label = widgets.HTML("<b>Your Gu Inventory (Max Cap: 6):</b>")
+    p_att_w = widgets.IntSlider(value=2, min=0, max=10, description="Attack Gu:")
+    p_def_w = widgets.IntSlider(value=1, min=0, max=10, description="Defense Gu:")
+    p_heal_w = widgets.IntSlider(value=1, min=0, max=10, description="Healing Gu:")
+    p_agi_w = widgets.IntSlider(value=2, min=0, max=10, description="Agility Gu:")
+    p_total_w = widgets.HTML("Total Allocated: 6 / 6")
 
-1. Sync the dependencies
+    def update_p_total(change):
+        total = p_att_w.value + p_def_w.value + p_heal_w.value + p_agi_w.value
+        cap = max_cap_map.get(p_rank_w.value, 2)
+        if total > cap:
+            p_total_w.value = f"<span style='color:red;'>Total Allocated: {total} / {cap} (EXCEEDS CAP!)</span>"
+        else:
+            p_total_w.value = f"Total Allocated: {total} / {cap}"
 
-   ```
-   $ uv sync
-   ```
+    p_rank_w.observe(lambda c: update_p_total(None), names='value')
+    p_att_w.observe(update_p_total, names='value')
+    p_def_w.observe(update_p_total, names='value')
+    p_heal_w.observe(update_p_total, names='value')
+    p_agi_w.observe(update_p_total, names='value')
+    update_p_total(None)
 
-2. Run the app
+    # AI Config Widgets
+    ai_name_w = widgets.Text(value="Gu Master B", description="AI Name:")
+    ai_rank_w = widgets.IntSlider(value=3, min=1, max=5, description="AI Rank:")
+    ai_apt_w = widgets.Dropdown(options=["Extreme", "A-Grade", "B-Grade", "C-Grade", "D-Grade"], value="A-Grade", description="Aptitude:")
+    
+    ai_label = widgets.HTML("<b>AI Gu Inventory (Max Cap: 6):</b>")
+    ai_att_w = widgets.IntSlider(value=2, min=0, max=10, description="Attack Gu:")
+    ai_def_w = widgets.IntSlider(value=1, min=0, max=10, description="Defense Gu:")
+    ai_heal_w = widgets.IntSlider(value=1, min=0, max=10, description="Healing Gu:")
+    ai_agi_w = widgets.IntSlider(value=2, min=0, max=10, description="Agility Gu:")
+    ai_total_w = widgets.HTML("AI Total Allocated: 6 / 6")
 
-   ```
-   $ uv run streamlit run streamlit_app.py
-   ```
+    fn_update_ai = lambda c: (
+        setattr(ai_total_w, 'value', f"<span style='color:red;'>AI Total Allocated: {ai_att_w.value + ai_def_w.value + ai_heal_w.value + ai_agi_w.value} / {max_cap_map.get(ai_rank_w.value, 2)} (EXCEEDS CAP!)</span>" if (ai_att_w.value + ai_def_w.value + ai_heal_w.value + ai_agi_w.value) > max_cap_map.get(ai_rank_w.value, 2) else f"AI Total Allocated: {ai_att_w.value + ai_def_w.value + ai_heal_w.value + ai_agi_w.value} / {max_cap_map.get(ai_rank_w.value, 2)}")
+    )
+    ai_rank_w.observe(fn_update_ai, names='value')
+    ai_att_w.observe(fn_update_ai, names='value')
+    ai_def_w.observe(fn_update_ai, names='value')
+    ai_heal_w.observe(fn_update_ai, names='value')
+    ai_agi_w.observe(fn_update_ai, names='value')
+    fn_update_ai(None)
+
+    start_btn = widgets.Button(description="Start Battle", button_style="primary")
+    setup_box = widgets.VBox([
+        widgets.HTML("<h3>Player Setup</h3>"),
+        p_name_w, p_rank_w, p_apt_w, p_label, p_att_w, p_def_w, p_heal_w, p_agi_w, p_total_w,
+        widgets.HTML("<h3>AI Setup</h3>"),
+        ai_name_w, ai_rank_w, ai_apt_w, ai_label, ai_att_w, ai_def_w, ai_heal_w, ai_agi_w, ai_total_w,
+        start_btn
+    ])
+    
+    output_area = widgets.Output()
+
+    def on_start_clicked(b):
+        with output_area:
+            clear_output(wait=True)
+            
+            p_cap = max_cap_map.get(p_rank_w.value, 2)
+            p_counts = {"Attack Gu": p_att_w.value, "Defense Gu": p_def_w.value, "Healing Gu": p_heal_w.value, "Agility Gu": p_agi_w.value}
+            if sum(p_counts.values()) > p_cap:
+                print(f"Error: Your total allocated Gu exceeds Rank {p_rank_w.value} cap ({p_cap}).")
+                display(setup_box)
+                return
+
+            ai_cap = max_cap_map.get(ai_rank_w.value, 2)
+            ai_counts = {"Attack Gu": ai_att_w.value, "Defense Gu": ai_def_w.value, "Healing Gu": ai_heal_w.value, "Agility Gu": ai_agi_w.value}
+            if sum(ai_counts.values()) > ai_cap:
+                print(f"Error: AI total allocated Gu exceeds Rank {ai_rank_w.value} cap ({ai_cap}).")
+                display(setup_box)
+                return
+
+            player = GuMaster(p_name_w.value, p_rank_w.value, p_apt_w.value, p_counts)
+            ai = GuMaster(ai_name_w.value, ai_rank_w.value, ai_apt_w.value, ai_counts)
+            
+            state = {'turn': 1}
+            
+            print("=== BATTLE COMMENCES ===")
+            print(player.status_report())
+            print(ai.status_report())
+            
+            action_dropdown = widgets.Dropdown(
+                options=[
+                    ('Attack Gu (10% Essence, 1 Thought, 20 DMG/rank)', 'attack'),
+                    ('Active Defense Gu (15% Essence, 1 Thought, 30 Shield/rank)', 'defense'),
+                    ('Healing Gu (15% Essence, 1 Thought, 20 HP/rank)', 'heal'),
+                    ('Agility Gu (5% Essence, 1 Thought, Speed Priority)', 'agility'),
+                ],
+                description='Action:',
+            )
+            queue_btn = widgets.Button(description='Queue Action', button_style='warning')
+            submit_turn_btn = widgets.Button(description='Submit Turn (Lock In)', button_style='success')
+            
+            turn_box = widgets.VBox([
+                widgets.HTML(f"<h4>Turn {state['turn']} - Queue Your Moves</h4>"),
+                action_dropdown,
+                widgets.HBox([queue_btn, submit_turn_btn])
+            ])
+            display(turn_box)
+            
+            def on_queue_clicked(btn):
+                with output_area:
+                    clear_output(wait=True)
+                    choice = action_dropdown.value
+                    
+                    if player.thoughts <= 0:
+                        print("-> No thoughts remaining to queue more actions! Click 'Submit Turn'.")
+                        display(turn_box)
+                        return
+                    
+                    gu_name_map = {'attack': 'Attack Gu', 'defense': 'Defense Gu', 'heal': 'Healing Gu', 'agility': 'Agility Gu'}
+                    cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 15.0, 'agility': 5.0}
+                    
+                    target_gu_name = gu_name_map[choice]
+                    max_owned = player.gu_counts.get(target_gu_name, 0)
+                    already_used = player.turn_gu_uses.get(target_gu_name, 0)
+                    
+                    if already_used >= max_owned:
+                        print(f"-> Cannot use {target_gu_name}! You equipped {max_owned} and have queued all of them this turn.")
+                        display(turn_box)
+                        return
+                        
+                    cost = cost_map[choice]
+                    if player.essence < cost:
+                        print(f"-> Not enough Essence ({player.essence:.1f}%) for {target_gu_name}!")
+                        display(turn_box)
+                        return
+                        
+                    player.thoughts -= 1
+                    player.essence -= cost
+                    player.turn_gu_uses[target_gu_name] = already_used + 1
+                    player.queued_actions.append(choice)
+                    
+                    print(f"Queued Actions: {player.queued_actions}")
+                    print(f"Remaining -> Thoughts: {player.thoughts}/{player.max_thoughts} | Essence: {player.essence:.1f}%")
+                    display(turn_box)
+
+            def on_submit_turn_clicked(btn):
+                with output_area:
+                    clear_output(wait=True)
+                    turn = state['turn']
+                    
+                    # --- SMART AI TACTICAL HEURISTIC PLANNING ---
+                    ai_usage = {}
+                    cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 15.0, 'agility': 5.0}
+                    name_to_key = {'Attack Gu': 'attack', 'Defense Gu': 'defense', 'Healing Gu': 'heal', 'Agility Gu': 'agility'}
+                    
+                    while ai.thoughts > 0:
+                        hp_pct = ai.hp / ai.max_hp
+                        action_chosen = None
+                        
+                        # Priority 1: Emergency Healing if low HP and has healing available & essence
+                        if hp_pct < 0.5 and ai.essence >= cost_map['heal'] and ai_usage.get('Healing Gu', 0) < ai.gu_counts.get('Healing Gu', 0):
+                            action_chosen = 'heal'
+                        
+                        # Priority 2: Secure Initiative / Agility if not active yet
+                        elif not ai.agility_active and ai.essence >= cost_map['agility'] and ai_usage.get('Agility Gu', 0) < ai.gu_counts.get('Agility Gu', 0):
+                            action_chosen = 'agility'
+                            ai.agility_active = True
+                        
+                        # Priority 3: Attack if possible and healthy/aggressive
+                        elif ai.essence >= cost_map['attack'] and ai_usage.get('Attack Gu', 0) < ai.gu_counts.get('Attack Gu', 0):
+                            # Occasionally weave defense if enemy is looking threatening or HP is mid
+                            if hp_pct < 0.75 and ai.essence >= cost_map['defense'] and ai_usage.get('Defense Gu', 0) < ai.gu_counts.get('Defense Gu', 0) and random.random() < 0.4:
+                                action_chosen = 'defense'
+                            else:
+                                action_chosen = 'attack'
+                        
+                        # Priority 4: Fallback to Defense or Healing if available
+                        elif ai.essence >= cost_map['defense'] and ai_usage.get('Defense Gu', 0) < ai.gu_counts.get('Defense Gu', 0):
+                            action_chosen = 'defense'
+                        elif ai.essence >= cost_map['heal'] and ai.hp < ai.max_hp and ai_usage.get('Healing Gu', 0) < ai.gu_counts.get('Healing Gu', 0):
+                            action_chosen = 'heal'
+                        else:
+                            action_chosen = 'pass'
+                        
+                        # Execute choice and deduct resources
+                        ai.thoughts -= 1
+                        if action_chosen != 'pass':
+                            for g_name, g_key in name_to_key.items():
+                                if g_key == action_chosen:
+                                    ai_usage[g_name] = ai_usage.get(g_name, 0) + 1
+                            ai.essence -= cost_map[action_chosen]
+                            ai.queued_actions.append(action_chosen)
+                        else:
+                            ai.queued_actions.append('pass')
+
+                    # Determine Initiative order
+                    p_has_ag = 'agility' in player.queued_actions
+                    ai_has_ag = 'agility' in ai.queued_actions
+                    
+                    if p_has_ag and not ai_has_ag:
+                        first, second = player, ai
+                        initiative_msg = f"{player.name} acts first (Agility Priority)."
+                    elif ai_has_ag and not p_has_ag:
+                        first, second = ai, player
+                        initiative_msg = f"{ai.name} acts first (Agility Priority)."
+                    else:
+                        if random.choice([True, False]):
+                            first, second = player, ai
+                            initiative_msg = f"Speed tied! Coin flip goes to {player.name}."
+                        else:
+                            first, second = ai, player
+                            initiative_msg = f"Speed tied! Coin flip goes to {ai.name}."
+
+                    print(f"================ TURN {turn} RESOLUTION ================")
+                    print(f"* {initiative_msg}\n")
+
+                    def resolve_master_turn(actor, target):
+                        shield_gained = 0
+                        hp_healed = 0
+                        dmg_dealt = 0
+                        shield_absorbed = 0
+                        
+                        for action in actor.queued_actions:
+                            if actor.hp <= 0 or target.hp <= 0:
+                                break
+                            if action == 'defense':
+                                shield_val = 30 * actor.rank
+                                actor.active_defense += shield_val
+                                shield_gained += shield_val
+                            elif action == 'heal':
+                                heal_amt = min(20 * actor.rank, actor.max_hp - actor.hp)
+                                actor.hp += heal_amt
+                                hp_healed += heal_amt
+                            elif action == 'agility':
+                                actor.agility_active = True
+                            elif action == 'attack':
+                                raw_dmg = 20 * actor.rank
+                                if target.active_defense > 0:
+                                    absorbed = min(target.active_defense, raw_dmg)
+                                    target.active_defense -= absorbed
+                                    shield_absorbed += absorbed
+                                    net_dmg = raw_dmg - absorbed
+                                    if net_dmg > 0:
+                                        target.hp -= net_dmg
+                                        dmg_dealt += net_dmg
+                                else:
+                                    target.hp -= raw_dmg
+                                    dmg_dealt += raw_dmg
+                        return shield_gained, hp_healed, dmg_dealt, shield_absorbed
+
+                    f_shield, f_heal, f_dmg, f_abs = resolve_master_turn(first, second)
+                    s_shield, s_heal, s_dmg, s_abs = resolve_master_turn(second, first)
+
+                    def print_summary(actor, shield, heal, dmg, abs_val):
+                        parts = []
+                        if shield > 0:
+                            parts.append(f"raised **{shield} Shield**")
+                        if heal > 0:
+                            parts.append(f"restored **{heal} HP**")
+                        if abs_val > 0:
+                            parts.append(f"absorbed **{abs_val} damage** with shields")
+                        if dmg > 0:
+                            parts.append(f"dealt **{dmg} Damage**")
+                        
+                        if parts:
+                            print(f"• **{actor.name}** " + ", ".join(parts) + ".")
+                        else:
+                            print(f"• **{actor.name}** passed or maneuvered.")
+
+                    print_summary(first, f_shield, f_heal, f_dmg, f_abs)
+                    print_summary(second, s_shield, s_heal, s_dmg, s_abs)
+
+                    state['turn'] += 1
+                    player.reset_turn()
+                    ai.reset_turn()
+
+                    print("\n--- End of Turn Status ---")
+                    print(player.status_report())
+                    print(ai.status_report())
+                    print("------------------------------------------\n")
+
+                    if player.hp <= 0 or ai.hp <= 0 or state['turn'] > 15:
+                        print("=== BATTLE OVER ===")
+                        if player.hp <= 0 and ai.hp <= 0:
+                            print("Mutual destruction! It's a draw.")
+                        elif player.hp <= 0:
+                            print("Defeat! AI wins.")
+                        elif ai.hp <= 0:
+                            print("Victory! You win.")
+                        else:
+                            print("Stalemate by turn limit!")
+                        return
+                    
+                    display(turn_box)
+
+            queue_btn.on_click(on_queue_clicked)
+            submit_turn_btn.on_click(on_submit_turn_clicked)
+
+    start_btn.on_click(on_start_clicked)
+    display(setup_box, output_area)
+
+run_gu_shop_battle()
