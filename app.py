@@ -5,7 +5,7 @@ import json
 
 # --- CONFIGURATION ---
 # Paste your Firebase Realtime Database URL here (e.g., "https://your-app-default-rtdb.firebaseio.com/")
-FIREBASE_URL = "YOUR_FIREBASE_URL_HERE"
+FIREBASE_URL = "https://gu-world-combat-default-rtdb.firebaseio.com/"
 
 st.title("Gu Master Async PvP")
 
