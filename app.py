@@ -110,7 +110,6 @@ else:
     st.markdown("---")
     st.subheader(f"Turn {st.session_state.turn} - Action Queue")
     
-    # Display currently queued actions so far this turn
     if player.queued_actions:
         st.write("**Your Queued Actions This Turn:**", ", ".join([a.capitalize() for a in player.queued_actions]))
     else:
@@ -191,45 +190,63 @@ else:
                     first, second = (player, ai) if random.choice([True, False]) else (ai, player)
 
                 def resolve_turn(actor, target):
-                    shield_gained, healed_amt, total_dmg, total_absorbed = 0, 0, 0, 0
-                    summary_actions = []
+                    total_shield = 0
+                    total_heal = 0
+                    raw_damage = 0
+                    total_absorbed = 0
+                    net_damage = 0
+                    
                     for action in actor.queued_actions:
                         if actor.hp <= 0 or target.hp <= 0:
                             break
                         if action == 'defense':
-                            s_val = 30 * actor.rank
-                            actor.active_defense += s_val
-                            shield_gained += s_val
-                            summary_actions.append(f"Defense (+{s_val} Shield)")
+                            total_shield += 30 * actor.rank
                         elif action == 'heal':
-                            h_val = min(20 * actor.rank, actor.max_hp - actor.hp)
-                            actor.hp += h_val
-                            healed_amt += h_val
-                            summary_actions.append(f"Heal (+{h_val} HP)")
+                            total_heal += 20 * actor.rank
                         elif action == 'agility':
                             actor.agility_active = True
-                            summary_actions.append("Agility")
                         elif action == 'attack':
-                            raw = 20 * actor.rank
-                            if target.active_defense > 0:
-                                absorbed = min(target.active_defense, raw)
-                                target.active_defense -= absorbed
-                                total_absorbed += absorbed
-                                net = raw - absorbed
-                                if net > 0:
-                                    target.hp -= net
-                                    total_dmg += net
-                                summary_actions.append(f"Attack (Absorbed {absorbed} shield, Dealt {net} DMG)")
-                            else:
-                                target.hp -= raw
-                                total_dmg += raw
-                                summary_actions.append(f"Attack (Dealt {raw} DMG)")
-                    return summary_actions, shield_gained, healed_amt, total_dmg, total_absorbed
+                            raw_damage += 20 * actor.rank
 
-                f_summary, f_shield, f_heal, f_dmg, f_abs = resolve_turn(first, second)
-                s_summary, s_shield, s_heal, s_dmg, s_abs = resolve_turn(second, first)
+                    # Apply defense and healing cumulatively
+                    if total_shield > 0:
+                        actor.active_defense += total_shield
+                    if total_heal > 0:
+                        actor.hp = min(actor.max_hp, actor.hp + total_heal)
+
+                    # Apply damage cumulatively against target's shield/HP
+                    if raw_damage > 0:
+                        if target.active_defense > 0:
+                            total_absorbed = min(target.active_defense, raw_damage)
+                            target.active_defense -= total_absorbed
+                            net_damage = raw_damage - total_absorbed
+                            if net_damage > 0:
+                                target.hp -= net_damage
+                        else:
+                            net_damage = raw_damage
+                            target.hp -= net_damage
+
+                    # Build clean summary string
+                    parts = []
+                    if total_shield > 0:
+                        parts.append(f"+{total_shield} Shield")
+                    if total_heal > 0:
+                        parts.append(f"+{total_heal} HP")
+                    if 'agility' in actor.queued_actions:
+                        parts.append("Agility")
+                    if raw_damage > 0:
+                        if total_absorbed > 0:
+                            parts.append(f"Dealt {net_damage} DMG ({total_absorbed} absorbed by shield)")
+                        else:
+                            parts.append(f"Dealt {net_damage} DMG")
+                    
+                    summary_text = ", ".join(parts) if parts else "Passed"
+                    return summary_text
+
+                f_summary = resolve_turn(first, second)
+                s_summary = resolve_turn(second, first)
                 
-                log_entry = f"Turn {st.session_state.turn}: {first.name} went first [{', '.join(f_summary)}]. Then {second.name} went [{', '.join(s_summary)}]."
+                log_entry = f"Turn {st.session_state.turn}: {first.name} went first [{f_summary}]. Then {second.name} went [{s_summary}]."
                 st.session_state.log.insert(1, log_entry)
                 
                 st.session_state.turn += 1
