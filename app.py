@@ -91,8 +91,8 @@ if not st.session_state.in_room:
                     "p1_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(c_rank, 200),
                     "p1_max_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(c_rank, 200),
                     "p1_essence": 100.0,
-                    "p1_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(c_rank, 1),
-                    "p1_max_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(c_rank, 1),
+                    "p1_thoughts": {1: 1, 2: 2, 3: 2, 4: 2, 5: 3}.get(c_rank, 1),
+                    "p1_max_thoughts": {1: 1, 2: 2, 3: 2, 4: 2, 5: 3}.get(c_rank, 1),
                     "p1_gu": {"Attack Gu": c_att, "Defense Gu": c_def, "Healing Gu": c_heal, "Agility Gu": c_agi},
                     "p1_shield": 0,
                     "p1_actions": [],
@@ -140,8 +140,8 @@ if not st.session_state.in_room:
                         "p2_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(j_rank, 200),
                         "p2_max_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(j_rank, 200),
                         "p2_essence": 100.0,
-                        "p2_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(j_rank, 1),
-                        "p2_max_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(j_rank, 1),
+                        "p2_thoughts": {1: 1, 2: 2, 3: 2, 4: 2, 5: 3}.get(j_rank, 1),
+                        "p2_max_thoughts": {1: 1, 2: 2, 3: 2, 4: 2, 5: 3}.get(j_rank, 1),
                         "p2_gu": {"Attack Gu": j_att, "Defense Gu": j_def, "Healing Gu": j_heal, "Agility Gu": j_agi},
                         "p2_shield": 0,
                         "p2_actions": [],
@@ -354,6 +354,7 @@ else:
             thought_regen = {1: 1, 2: 2, 3: 2, 4: 2, 5: 3}.get(rank, 1)
             max_t = room[f"{p}_max_thoughts"]
             room[f"{p}_thoughts"] = min(max_t, room[f"{p}_thoughts"] + thought_regen)
+            room[f"{p}_shield"] = 0  # Unused shields clear out at the end of the turn!
             room[f"{p}_actions"] = []
 
         update_room_data(st.session_state.room_id, room)
@@ -379,4 +380,3 @@ else:
             st.session_state.player_role = ""
             st.session_state.staged_actions = []
             st.rerun()
- 
