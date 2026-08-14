@@ -72,37 +72,43 @@ if not st.session_state.in_room:
         
         c_cap = max_cap_map.get(c_rank, 2)
         st.markdown(f"**Gu Inventory (Cap: {c_cap})**")
-        c_att = st.slider("Attack Gu", 0, 10, 2, key="c_att")
-        c_def = st.slider("Defense Gu", 0, 10, 1, key="c_def")
-        c_heal = st.slider("Healing Gu", 0, 10, 1, key="c_heal")
-        c_agi = st.slider("Agility Gu", 0, 10, 2, key="c_agi")
+        c_att = st.slider("Attack Gu", 0, c_cap, min(2, c_cap), key="c_att")
+        c_def = st.slider("Defense Gu", 0, c_cap, min(1, c_cap), key="c_def")
+        c_heal = st.slider("Healing Gu", 0, c_cap, min(1, c_cap), key="c_heal")
+        c_agi = st.slider("Agility Gu", 0, c_cap, min(1, c_cap), key="c_agi")
+        
+        if (c_att + c_def + c_heal + c_agi) > c_cap:
+            st.warning(f"Total Gu ({c_att + c_def + c_heal + c_agi}) exceeds Rank {c_rank} cap of {c_cap}!")
         
         if st.button("Host Match", type="primary"):
-            initial_state = {
-                "p1_name": c_name,
-                "p1_rank": c_rank,
-                "p1_apt": c_apt,
-                "p1_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(c_rank, 200),
-                "p1_max_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(c_rank, 200),
-                "p1_essence": 100.0,
-                "p1_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(c_rank, 1),
-                "p1_max_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(c_rank, 1),
-                "p1_gu": {"Attack Gu": c_att, "Defense Gu": c_def, "Healing Gu": c_heal, "Agility Gu": c_agi},
-                "p1_shield": 0,
-                "p1_actions": [],
-                "p2_name": "",
-                "turn": 1,
-                "game_status": "waiting",
-                "log": ["=== BATTLE COMMENCES ==="]
-            }
-            requests.put(f"{FIREBASE_URL}/rooms/{c_room}.json", json=initial_state)
-            st.session_state.room_id = c_room
-            st.session_state.player_role = "p1"
-            st.session_state.in_room = True
-            st.session_state.staged_actions = []
-            st.session_state.staged_essence_cost = 0.0
-            st.session_state.staged_thoughts_used = 0
-            st.rerun()
+            if (c_att + c_def + c_heal + c_agi) > c_cap:
+                st.error("Cannot host: Gu count exceeds your rank limit!")
+            else:
+                initial_state = {
+                    "p1_name": c_name,
+                    "p1_rank": c_rank,
+                    "p1_apt": c_apt,
+                    "p1_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(c_rank, 200),
+                    "p1_max_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(c_rank, 200),
+                    "p1_essence": 100.0,
+                    "p1_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(c_rank, 1),
+                    "p1_max_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(c_rank, 1),
+                    "p1_gu": {"Attack Gu": c_att, "Defense Gu": c_def, "Healing Gu": c_heal, "Agility Gu": c_agi},
+                    "p1_shield": 0,
+                    "p1_actions": [],
+                    "p2_name": "",
+                    "turn": 1,
+                    "game_status": "waiting",
+                    "log": ["=== BATTLE COMMENCES ==="]
+                }
+                requests.put(f"{FIREBASE_URL}/rooms/{c_room}.json", json=initial_state)
+                st.session_state.room_id = c_room
+                st.session_state.player_role = "p1"
+                st.session_state.in_room = True
+                st.session_state.staged_actions = []
+                st.session_state.staged_essence_cost = 0.0
+                st.session_state.staged_thoughts_used = 0
+                st.rerun()
 
     with col2:
         st.markdown("### Join Room")
@@ -113,38 +119,44 @@ if not st.session_state.in_room:
         
         j_cap = max_cap_map.get(j_rank, 2)
         st.markdown(f"**Gu Inventory (Cap: {j_cap})**")
-        j_att = st.slider("Attack Gu", 0, 10, 2, key="j_att")
-        j_def = st.slider("Defense Gu", 0, 10, 1, key="j_def")
-        j_heal = st.slider("Healing Gu", 0, 10, 1, key="j_heal")
-        j_agi = st.slider("Agility Gu", 0, 10, 2, key="j_agi")
+        j_att = st.slider("Attack Gu", 0, j_cap, min(2, j_cap), key="j_att")
+        j_def = st.slider("Defense Gu", 0, j_cap, min(1, j_cap), key="j_def")
+        j_heal = st.slider("Healing Gu", 0, j_cap, min(1, j_cap), key="j_heal")
+        j_agi = st.slider("Agility Gu", 0, j_cap, min(1, j_cap), key="j_agi")
+        
+        if (j_att + j_def + j_heal + j_agi) > j_cap:
+            st.warning(f"Total Gu ({j_att + j_def + j_heal + j_agi}) exceeds Rank {j_rank} cap of {j_cap}!")
         
         if st.button("Join Match"):
-            room_data = get_room_data(j_room)
-            if room_data:
-                update_data = {
-                    "p2_name": j_name,
-                    "p2_rank": j_rank,
-                    "p2_apt": j_apt,
-                    "p2_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(j_rank, 200),
-                    "p2_max_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(j_rank, 200),
-                    "p2_essence": 100.0,
-                    "p2_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(j_rank, 1),
-                    "p2_max_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(j_rank, 1),
-                    "p2_gu": {"Attack Gu": j_att, "Defense Gu": j_def, "Healing Gu": j_heal, "Agility Gu": j_agi},
-                    "p2_shield": 0,
-                    "p2_actions": [],
-                    "game_status": "battling"
-                }
-                update_room_data(j_room, update_data)
-                st.session_state.room_id = j_room
-                st.session_state.player_role = "p2"
-                st.session_state.in_room = True
-                st.session_state.staged_actions = []
-                st.session_state.staged_essence_cost = 0.0
-                st.session_state.staged_thoughts_used = 0
-                st.rerun()
+            if (j_att + j_def + j_heal + j_agi) > j_cap:
+                st.error("Cannot join: Gu count exceeds your rank limit!")
             else:
-                st.error("Room not found!")
+                room_data = get_room_data(j_room)
+                if room_data:
+                    update_data = {
+                        "p2_name": j_name,
+                        "p2_rank": j_rank,
+                        "p2_apt": j_apt,
+                        "p2_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(j_rank, 200),
+                        "p2_max_hp": {1: 200, 2: 400, 3: 600, 4: 800, 5: 1000}.get(j_rank, 200),
+                        "p2_essence": 100.0,
+                        "p2_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(j_rank, 1),
+                        "p2_max_thoughts": {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}.get(j_rank, 1),
+                        "p2_gu": {"Attack Gu": j_att, "Defense Gu": j_def, "Healing Gu": j_heal, "Agility Gu": j_agi},
+                        "p2_shield": 0,
+                        "p2_actions": [],
+                        "game_status": "battling"
+                    }
+                    update_room_data(j_room, update_data)
+                    st.session_state.room_id = j_room
+                    st.session_state.player_role = "p2"
+                    st.session_state.in_room = True
+                    st.session_state.staged_actions = []
+                    st.session_state.staged_essence_cost = 0.0
+                    st.session_state.staged_thoughts_used = 0
+                    st.rerun()
+                else:
+                    st.error("Room not found!")
 
 # --- BATTLE SCREEN ---
 else:
@@ -206,18 +218,17 @@ else:
     elif len(my_submitted_actions) == 0 and room.get(f'{my_prefix}_hp', 0) > 0:
         st.subheader("Action Queueing")
         
-        # Display currently staged local actions
         if st.session_state.staged_actions:
             st.markdown(f"**Staged Actions (Not Locked In Yet):** {', '.join(st.session_state.staged_actions)}")
 
         action_choice = st.selectbox("Choose Action to Queue:", [
             ('Attack Gu (10% Essence, 1 Thought, 20 DMG/rank)', 'attack'),
             ('Active Defense Gu (15% Essence, 1 Thought, 30 Shield/rank)', 'defense'),
-            ('Healing Gu (15% Essence, 1 Thought, 20 HP/rank)', 'heal'),
+            ('Healing Gu (7.5% Essence, 1 Thought, 10 HP/rank)', 'heal'),
             ('Agility Gu (5% Essence, 1 Thought, Speed Priority)', 'agility'),
         ], format_func=lambda x: x[0])
         
-        cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 15.0, 'agility': 5.0}
+        cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 7.5, 'agility': 5.0}
         
         col_q1, col_q2 = st.columns(2)
         with col_q1:
@@ -227,10 +238,24 @@ else:
                 avail_e = room.get(f'{my_prefix}_essence', 0) - st.session_state.staged_essence_cost
                 avail_t = room.get(f'{my_prefix}_thoughts', 0) - st.session_state.staged_thoughts_used
                 
+                # Check Gu inventory count limits
+                gu_inventory = room.get(f'{my_prefix}_gu', {})
+                action_gu_name_map = {
+                    'attack': 'Attack Gu',
+                    'defense': 'Defense Gu',
+                    'heal': 'Healing Gu',
+                    'agility': 'Agility Gu'
+                }
+                gu_type_name = action_gu_name_map.get(choice_key)
+                max_gu_available = gu_inventory.get(gu_type_name, 0)
+                current_staged_count = st.session_state.staged_actions.count(choice_key)
+
                 if avail_t <= 0:
                     st.warning("No thoughts remaining to queue another action!")
                 elif avail_e < choice_cost:
                     st.warning("Not enough remaining essence!")
+                elif current_staged_count >= max_gu_available:
+                    st.warning(f"You only own {max_gu_available} {gu_type_name}(s) in your inventory!")
                 else:
                     st.session_state.staged_thoughts_used += 1
                     st.session_state.staged_essence_cost += choice_cost
@@ -248,7 +273,6 @@ else:
             if not st.session_state.staged_actions:
                 st.warning("You must queue at least one action before submitting!")
             else:
-                # Deduct permanently from room state and save
                 new_thoughts = room.get(f'{my_prefix}_thoughts', 0) - st.session_state.staged_thoughts_used
                 new_essence = room.get(f'{my_prefix}_essence', 0) - st.session_state.staged_essence_cost
                 
@@ -257,7 +281,6 @@ else:
                     f"{my_prefix}_essence": new_essence,
                     f"{my_prefix}_actions": st.session_state.staged_actions
                 })
-                # Reset local staging memory
                 st.session_state.staged_actions = []
                 st.session_state.staged_essence_cost = 0.0
                 st.session_state.staged_thoughts_used = 0
@@ -282,7 +305,7 @@ else:
                     total_shield += 30 * rank
                 elif action == 'heal':
                     max_hp = room[f"{actor_pref}_max_hp"]
-                    total_heal += min(20 * rank, max_hp - room[f"{actor_pref}_hp"])
+                    total_heal += min(10 * rank, max_hp - room[f"{actor_pref}_hp"])
                 elif action == 'attack':
                     raw_damage += 20 * rank
 
@@ -356,3 +379,4 @@ else:
             st.session_state.player_role = ""
             st.session_state.staged_actions = []
             st.rerun()
+ 
