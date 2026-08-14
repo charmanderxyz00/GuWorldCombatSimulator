@@ -1,10 +1,8 @@
 import streamlit as st
 import random
 import requests
-import json
 
 # --- CONFIGURATION ---
-# Paste your Firebase Realtime Database URL here (e.g., "https://your-app-default-rtdb.firebaseio.com/")
 FIREBASE_URL = "https://gu-world-combat-default-rtdb.firebaseio.com/"
 
 st.title("Gu Master Async PvP")
@@ -17,7 +15,7 @@ if FIREBASE_URL == "YOUR_FIREBASE_URL_HERE":
 if 'room_id' not in st.session_state:
     st.session_state.room_id = ""
 if 'player_role' not in st.session_state:
-    st.session_state.player_role = "" # 'p1' or 'p2'
+    st.session_state.player_role = "" 
 if 'in_room' not in st.session_state:
     st.session_state.in_room = False
 
@@ -35,6 +33,21 @@ def update_room_data(room_id, data):
         requests.patch(f"{FIREBASE_URL}/rooms/{room_id}.json", json=data)
     except:
         pass
+
+# Global Escape Hatch in Sidebar
+with st.sidebar:
+    st.subheader("Controls")
+    if st.session_state.in_room:
+        if st.button("🚪 Leave / Delete Room", type="primary"):
+            if st.session_state.room_id:
+                try:
+                    requests.delete(f"{FIREBASE_URL}/rooms/{st.session_state.room_id}.json")
+                except:
+                    pass
+            st.session_state.in_room = False
+            st.session_state.room_id = ""
+            st.session_state.player_role = ""
+            st.rerun()
 
 # --- LOBBY SCREEN ---
 if not st.session_state.in_room:
@@ -122,9 +135,11 @@ if not st.session_state.in_room:
 else:
     room = get_room_data(st.session_state.room_id)
     if not room:
-        st.error("Room disconnected.")
-        if st.button("Back to Lobby"):
+        st.warning("Room was closed or disconnected.")
+        if st.button("Return to Lobby"):
             st.session_state.in_room = False
+            st.session_state.room_id = ""
+            st.session_state.player_role = ""
             st.rerun()
         st.stop()
 
@@ -142,22 +157,21 @@ else:
     
     col_p, col_ai = st.columns(2)
     with col_p:
-        st.markdown(f"### {room[f'{my_prefix}_name']} (You)")
-        st.write(f"**HP:** {room[f'{my_prefix}_hp']}/{room[f'{my_prefix}_max_hp']}")
-        st.write(f"**Essence:** {room[f'{my_prefix}_essence']:.1f}% | **Thoughts:** {room[f'{my_prefix}_thoughts']}")
-        if room[f'{my_prefix}_shield'] > 0:
-            st.info(f"Shield: {room[f'{my_prefix}_shield']}")
+        st.markdown(f"### {room.get(f'{my_prefix}_name', 'You')} (You)")
+        st.write(f"**HP:** {room.get(f'{my_prefix}_hp', 0)}/{room.get(f'{my_prefix}_max_hp', 100)}")
+        st.write(f"**Essence:** {room.get(f'{my_prefix}_essence', 0):.1f}% | **Thoughts:** {room.get(f'{my_prefix}_thoughts', 0)}")
+        if room.get(f'{my_prefix}_shield', 0) > 0:
+            st.info(f"Shield: {room.get(f'{my_prefix}_shield')}")
             
     with col_ai:
-        st.markdown(f"### {room[f'{opp_prefix}_name']} (Opponent)")
-        st.write(f"**HP:** {room[f'{opp_prefix}_hp']}/{room[f'{opp_prefix}_max_hp']}")
-        st.write(f"**Essence:** {room[f'{opp_prefix}_essence']:.1f}% | **Thoughts:** {room[f'{opp_prefix}_thoughts']}")
-        if room[f'{opp_prefix}_shield'] > 0:
-            st.info(f"Shield: {room[f'{opp_prefix}_shield']}")
+        st.markdown(f"### {room.get(f'{opp_prefix}_name', 'Opponent')} (Opponent)")
+        st.write(f"**HP:** {room.get(f'{opp_prefix}_hp', 0)}/{room.get(f'{opp_prefix}_max_hp', 100)}")
+        st.write(f"**Essence:** {room.get(f'{opp_prefix}_essence', 0):.1f}% | **Thoughts:** {room.get(f'{opp_prefix}_thoughts', 0)}")
+        if room.get(f'{opp_prefix}_shield', 0) > 0:
+            st.info(f"Shield: {room.get(f'{opp_prefix}_shield')}")
 
     st.markdown("---")
 
-    # Check turn submission status
     my_actions = room.get(f"{my_prefix}_actions", [])
     opp_actions = room.get(f"{opp_prefix}_actions", [])
 
@@ -165,7 +179,7 @@ else:
         st.info("Turn submitted! Waiting for opponent to lock in their actions...")
         if st.button("Refresh Status"):
             st.rerun()
-    elif len(my_actions) == 0 and room[f'{my_prefix}_thoughts'] > 0 and room[f'{my_prefix}_hp'] > 0:
+    elif len(my_actions) == 0 and room.get(f'{my_prefix}_thoughts', 0) > 0 and room.get(f'{my_prefix}_hp', 0) > 0:
         st.subheader("Action Queueing")
         action_choice = st.selectbox("Choose Action to Queue:", [
             ('Attack Gu (10% Essence, 1 Thought, 20 DMG/rank)', 'attack'),
@@ -196,10 +210,6 @@ else:
 
     # If both submitted, process turn
     if len(room.get("p1_actions", [])) > 0 and len(room.get("p2_actions", [])) > 0:
-        p1 = room
-        p2 = room
-        
-        # Process resolution
         def resolve_turn(actor_pref, target_pref):
             actor_actions = room.get(f"{actor_pref}_actions", [])
             total_shield = 0
@@ -246,7 +256,6 @@ else:
                 parts.append(f"Dealt {net_damage} DMG")
             return ", ".join(parts) if parts else "Passed"
 
-        # Simple speed resolution or random tie-break
         first, second = ("p1", "p2") if random.choice([True, False]) else ("p2", "p1")
         f_summary = resolve_turn(first, second)
         s_summary = resolve_turn(second, first)
@@ -258,7 +267,6 @@ else:
         room["log"].insert(1, log_entry)
         room["turn"] += 1
         
-        # Reset turn values
         for p in ["p1", "p2"]:
             apt = room[f"{p}_apt"]
             regen_rate = 25.0 if apt == "Extreme" else 12.0
@@ -276,13 +284,18 @@ else:
     for entry in room.get("log", []):
         st.text(entry)
 
-    if room["p1_hp"] <= 0 or room["p2_hp"] <= 0:
+    if room.get("p1_hp", 0) <= 0 or room.get("p2_hp", 0) <= 0:
         st.subheader("=== BATTLE OVER ===")
-        if room[f"{my_prefix}_hp"] <= 0:
+        if room.get(f"{my_prefix}_hp", 0) <= 0:
             st.error("Defeat!")
         else:
             st.success("Victory!")
         if st.button("Reset Room"):
-            requests.delete(f"{FIREBASE_URL}/rooms/{st.session_state.room_id}.json")
+            try:
+                requests.delete(f"{FIREBASE_URL}/rooms/{st.session_state.room_id}.json")
+            except:
+                pass
             st.session_state.in_room = False
+            st.session_state.room_id = ""
+            st.session_state.player_role = ""
             st.rerun()
