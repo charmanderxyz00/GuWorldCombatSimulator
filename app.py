@@ -98,14 +98,24 @@ else:
         st.markdown(f"### {player.name}")
         st.write(f"**HP:** {player.hp}/{player.max_hp}")
         st.write(f"**Essence:** {player.essence:.1f}% | **Thoughts:** {player.thoughts}/{player.max_thoughts}")
+        if player.active_defense > 0:
+            st.info(f"Active Shield: {player.active_defense}")
     with col_ai:
         st.markdown(f"### {ai.name}")
         st.write(f"**HP:** {ai.hp}/{ai.max_hp}")
         st.write(f"**Essence:** {ai.essence:.1f}% | **Thoughts:** {ai.thoughts}/{ai.max_thoughts}")
+        if ai.active_defense > 0:
+            st.info(f"Active Shield: {ai.active_defense}")
 
     st.markdown("---")
     st.subheader(f"Turn {st.session_state.turn} - Action Queue")
     
+    # Display currently queued actions so far this turn
+    if player.queued_actions:
+        st.write("**Your Queued Actions This Turn:**", ", ".join([a.capitalize() for a in player.queued_actions]))
+    else:
+        st.write("**Your Queued Actions This Turn:** None yet")
+
     if player.hp > 0 and ai.hp > 0 and st.session_state.turn <= 15:
         action_choice = st.selectbox("Choose Action to Queue:", [
             ('Attack Gu (10% Essence, 1 Thought, 20 DMG/rank)', 'attack'),
@@ -181,39 +191,46 @@ else:
                     first, second = (player, ai) if random.choice([True, False]) else (ai, player)
 
                 def resolve_turn(actor, target):
-                    shield, heal, dmg, abs_val = 0, 0, 0, 0
+                    shield_gained, healed_amt, total_dmg, total_absorbed = 0, 0, 0, 0
+                    summary_actions = []
                     for action in actor.queued_actions:
                         if actor.hp <= 0 or target.hp <= 0:
                             break
                         if action == 'defense':
                             s_val = 30 * actor.rank
                             actor.active_defense += s_val
-                            shield += s_val
+                            shield_gained += s_val
+                            summary_actions.append(f"Defense (+{s_val} Shield)")
                         elif action == 'heal':
                             h_val = min(20 * actor.rank, actor.max_hp - actor.hp)
                             actor.hp += h_val
-                            heal += h_val
+                            healed_amt += h_val
+                            summary_actions.append(f"Heal (+{h_val} HP)")
                         elif action == 'agility':
                             actor.agility_active = True
+                            summary_actions.append("Agility")
                         elif action == 'attack':
                             raw = 20 * actor.rank
                             if target.active_defense > 0:
                                 absorbed = min(target.active_defense, raw)
                                 target.active_defense -= absorbed
-                                abs_val += absorbed
+                                total_absorbed += absorbed
                                 net = raw - absorbed
                                 if net > 0:
                                     target.hp -= net
-                                    dmg += net
+                                    total_dmg += net
+                                summary_actions.append(f"Attack (Absorbed {absorbed} shield, Dealt {net} DMG)")
                             else:
                                 target.hp -= raw
-                                dmg += raw
-                    return shield, heal, dmg, abs_val
+                                total_dmg += raw
+                                summary_actions.append(f"Attack (Dealt {raw} DMG)")
+                    return summary_actions, shield_gained, healed_amt, total_dmg, total_absorbed
 
-                f_shield, f_heal, f_dmg, f_abs = resolve_turn(first, second)
-                s_shield, s_heal, s_dmg, s_abs = resolve_turn(second, first)
+                f_summary, f_shield, f_heal, f_dmg, f_abs = resolve_turn(first, second)
+                s_summary, s_shield, s_heal, s_dmg, s_abs = resolve_turn(second, first)
                 
-                st.session_state.log.insert(1, f"Turn {st.session_state.turn}: {first.name} acted first. {first.name} dealt {f_dmg} DMG | {second.name} dealt {s_dmg} DMG.")
+                log_entry = f"Turn {st.session_state.turn}: {first.name} went first [{', '.join(f_summary)}]. Then {second.name} went [{', '.join(s_summary)}]."
+                st.session_state.log.insert(1, log_entry)
                 
                 st.session_state.turn += 1
                 player.reset_turn()
