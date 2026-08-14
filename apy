@@ -3,7 +3,6 @@ import random
 
 st.title("Gu Master Duel Simulator")
 
-# Initialize Session State for Game Loop persistence
 if 'battle_started' not in st.session_state:
     st.session_state.battle_started = False
 if 'turn' not in st.session_state:
@@ -143,7 +142,6 @@ else:
 
         with col_btn2:
             if st.button("Submit Turn (Lock In)", type="primary"):
-                # --- Smart AI Logic Execution ---
                 ai_usage = {}
                 cost_map = {'attack': 10.0, 'defense': 15.0, 'heal': 15.0, 'agility': 5.0}
                 name_to_key = {'Attack Gu': 'attack', 'Defense Gu': 'defense', 'Healing Gu': 'heal', 'Agility Gu': 'agility'}
@@ -173,7 +171,6 @@ else:
                     else:
                         ai.queued_actions.append('pass')
 
-                # Initiative check
                 p_has_ag = 'agility' in player.queued_actions
                 ai_has_ag = 'agility' in ai.queued_actions
                 if p_has_ag and not ai_has_ag:
