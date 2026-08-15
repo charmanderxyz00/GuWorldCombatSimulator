@@ -30,6 +30,8 @@ if 'staged_thoughts_used' not in st.session_state:
 rank_max_single = {1: 20, 2: 40, 3: 60, 4: 80, 5: 100}
 rank_total_pool = {1: 50, 2: 100, 3: 150, 4: 200, 5: 250}
 max_cap_map = {1: 2, 2: 4, 3: 6, 4: 8, 5: 10}
+base_flesh_hp_map = {1: 200.0, 2: 400.0, 3: 600.0, 4: 800.0, 5: 1000.0}
+rank_max_thoughts = {1: 1, 2: 2, 3: 4, 4: 5, 5: 6}
 
 def get_room_data(room_id):
     if st.session_state.is_bot_match:
@@ -109,8 +111,8 @@ if not st.session_state.in_room:
             elif (c_att + c_def_gu + c_heal + c_agi_gu) > c_cap:
                 st.error("Cannot host: Gu count exceeds your rank limit!")
             else:
-                max_hp = c_def * 10.0
-                max_thoughts = 1 + (c_int // 20)
+                max_hp = base_flesh_hp_map.get(c_rank, 200.0) + (c_def * 10.0)
+                max_thoughts = rank_max_thoughts.get(c_rank, 1) + (c_int // 20)
                 initial_state = {
                     "p1_name": c_name,
                     "p1_rank": c_rank,
@@ -179,8 +181,8 @@ if not st.session_state.in_room:
             else:
                 room_data = get_room_data(j_room)
                 if room_data:
-                    max_hp = j_def * 10.0
-                    max_thoughts = 1 + (j_int // 20)
+                    max_hp = base_flesh_hp_map.get(j_rank, 200.0) + (j_def * 10.0)
+                    max_thoughts = rank_max_thoughts.get(j_rank, 1) + (j_int // 20)
                     update_data = {
                         "p2_name": j_name,
                         "p2_rank": j_rank,
@@ -276,11 +278,11 @@ if not st.session_state.in_room:
             elif (bot_att + bot_def_gu_b + bot_heal_b + bot_agi_gu_b) > bot_cap:
                 st.error("Cannot start: Bot Gu count exceeds bot rank limit!")
             else:
-                p1_max_hp = b_def * 10.0
-                p1_max_thoughts = 1 + (b_int // 20)
+                p1_max_hp = base_flesh_hp_map.get(b_rank, 200.0) + (b_def * 10.0)
+                p1_max_thoughts = rank_max_thoughts.get(b_rank, 1) + (b_int // 20)
                 
-                bot_max_hp = bot_def * 10.0
-                bot_max_thoughts = 1 + (bot_int // 20)
+                bot_max_hp = base_flesh_hp_map.get(bot_rank, 200.0) + (bot_def * 10.0)
+                bot_max_thoughts = rank_max_thoughts.get(bot_rank, 1) + (bot_int // 20)
 
                 st.session_state.bot_room_data = {
                     "p1_name": b_name,
@@ -381,7 +383,6 @@ else:
     opp_submitted_actions = room.get(f"{opp_prefix}_actions", [])
 
     if st.session_state.is_bot_match and len(my_submitted_actions) == 0 and room.get(f'{my_prefix}_hp', 0) > 0:
-        # Generate bot actions automatically if fighting AI
         bot_thoughts = room.get(f"{opp_prefix}_thoughts", 1)
         bot_essence = room.get(f"{opp_prefix}_essence", 100.0)
         bot_gu = room.get(f"{opp_prefix}_gu", {})
@@ -487,17 +488,17 @@ else:
     room = get_room_data(st.session_state.room_id)
     if room and len(room.get("p1_actions", [])) > 0 and len(room.get("p2_actions", [])) > 0:
         
-        # Calculate speeds and initiative ordering for each action item
         p1_actions = room.get("p1_actions", [])
         p2_actions = room.get("p2_actions", [])
         
+        p1_rank = room.get("p1_rank", 1)
+        p2_rank = room.get("p2_rank", 1)
         p1_agi_stat = room.get("p1_agi", 0)
         p2_agi_stat = room.get("p2_agi", 0)
         
-        # Build action queue tuples: (speed_value, actor_prefix, action_type, original_index)
         all_action_queue = []
         for idx, act in enumerate(p1_actions):
-            act_speed = p1_agi_stat + (5 if act == 'agility' else 0)
+            act_speed = (p1_actions.count('agility') * p1_rank) + p1_agi_stat + (5 if act == 'agility' else 0)
             all_action_queue.append({
                 'actor': 'p1',
                 'target': 'p2',
@@ -507,7 +508,7 @@ else:
             })
             
         for idx, act in enumerate(p2_actions):
-            act_speed = p2_agi_stat + (5 if act == 'agility' else 0)
+            act_speed = (p2_actions.count('agility') * p2_rank) + p2_agi_stat + (5 if act == 'agility' else 0)
             all_action_queue.append({
                 'actor': 'p2',
                 'target': 'p1',
@@ -516,10 +517,8 @@ else:
                 'index': idx
             })
             
-        # Sort by speed descending; tie-break randomly
         all_action_queue.sort(key=lambda x: (x['speed'], random.random()), reverse=True)
         
-        # Track summary logs per player
         p1_summaries = []
         p2_summaries = []
         
@@ -539,7 +538,9 @@ else:
             
             if action == 'defense':
                 base_shield = 30.0 * rank
-                shield_val = base_shield + (def_stat * 1.5) * (1.0 + (def_stat * 0.01))
+                flat_shield_bonus = def_stat * 1.5
+                pct_shield_mult = 1.0 + (def_stat * 0.01)
+                shield_val = (base_shield + flat_shield_bonus) * pct_shield_mult
                 room[f"{actor}_shield"] += shield_val
                 msg = f"+{shield_val:.1f} Shield"
                 if actor == 'p1': p1_summaries.append(msg)
@@ -559,8 +560,8 @@ else:
                 else: p2_summaries.append(msg)
                 
             elif action == 'attack':
-                evasion_chance = min(50.0, target_agi)
-                hit_chance = max(50.0, 85.0 + agi - evasion_chance)
+                evasion_chance = min(50.0, target_agi * 1.0)
+                hit_chance = max(50.0, 85.0 + (agi * 1.0) - evasion_chance)
                 
                 if random.uniform(0, 100) > hit_chance:
                     msg = "Attack Missed!"
@@ -620,7 +621,7 @@ else:
             room[f"{p}_essence"] = min(100.0, room[f"{p}_essence"] + essence_regen)
             
             rank = room[f"{p}_rank"]
-            base_thought_regen = rank_max_thoughts.get(rank, 1) if 'rank_max_thoughts' in globals() else 1
+            base_thought_regen = rank_max_thoughts.get(rank, 1)
             bonus_thought_regen = int_stat // 50
             total_thought_regen = base_thought_regen + bonus_thought_regen
             
