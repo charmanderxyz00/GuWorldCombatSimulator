@@ -219,7 +219,7 @@ if not st.session_state.in_room:
         
         b_max_stat = rank_max_single.get(b_rank, 20)
         b_max_pool = rank_total_pool.get(b_rank, 50)
-        st.markdown(f"**Stat Allocation (Max Pool: {b_max_pool}, Max Single: {b_max_stat})**")
+        st.markdown(f"**Your Stat Allocation (Max Pool: {b_max_pool}, Max Single: {b_max_stat})**")
         b_pwr = st.slider("PWR (Power)", 0, b_max_stat, 10, key="b_pwr")
         b_agi = st.slider("AGI (Agility)", 0, b_max_stat, 10, key="b_agi")
         b_int = st.slider("INT (Wisdom)", 0, b_max_stat, 10, key="b_int")
@@ -230,7 +230,7 @@ if not st.session_state.in_room:
             st.warning(f"Total Stats ({b_total_stats}) exceeds Rank {b_rank} pool limit of {b_max_pool}!")
 
         b_cap = max_cap_map.get(b_rank, 2)
-        st.markdown(f"**Gu Inventory (Cap: {b_cap})**")
+        st.markdown(f"**Your Gu Inventory (Cap: {b_cap})**")
         b_att = st.slider("Attack Gu", 0, b_cap, min(2, b_cap), key="b_att")
         b_def_gu = st.slider("Defense Gu", 0, b_cap, min(1, b_cap), key="b_def_gu")
         b_heal = st.slider("Healing Gu", 0, b_cap, min(1, b_cap), key="b_heal")
@@ -238,22 +238,47 @@ if not st.session_state.in_room:
         
         if (b_att + b_def_gu + b_heal + b_agi_gu) > b_cap:
             st.warning(f"Total Gu ({b_att + b_def_gu + b_heal + b_agi_gu}) exceeds Rank {b_rank} cap of {b_cap}!")
+
+        st.markdown("---")
+        st.markdown("### Bot Configuration")
+        bot_name = st.text_input("Bot Name", "Shadow Sect AI", key="bot_name")
+        bot_rank = st.slider("Bot Rank", 1, 5, 3, key="bot_rank")
+        bot_max_stat = rank_max_single.get(bot_rank, 20)
+        bot_max_pool = rank_total_pool.get(bot_rank, 50)
+        
+        st.markdown(f"**Bot Stat Allocation (Max Pool: {bot_max_pool}, Max Single: {bot_max_stat})**")
+        bot_pwr = st.slider("Bot PWR (Power)", 0, bot_max_stat, 10, key="bot_pwr")
+        bot_agi = st.slider("Bot AGI (Agility)", 0, bot_max_stat, 10, key="bot_agi")
+        bot_int = st.slider("Bot INT (Wisdom)", 0, bot_max_stat, 10, key="bot_int")
+        bot_def = st.slider("Bot DEF (Defense)", 0, bot_max_stat, 10, key="bot_def")
+        
+        bot_total_stats = bot_pwr + bot_agi + bot_int + bot_def
+        if bot_total_stats > bot_max_pool:
+            st.warning(f"Bot Total Stats ({bot_total_stats}) exceeds Rank {bot_rank} pool limit of {bot_max_pool}!")
+
+        bot_cap = max_cap_map.get(bot_rank, 2)
+        st.markdown(f"**Bot Gu Inventory (Cap: {bot_cap})**")
+        bot_att = st.slider("Bot Attack Gu", 0, bot_cap, min(2, bot_cap), key="bot_att")
+        bot_def_gu_b = st.slider("Bot Defense Gu", 0, bot_cap, min(1, bot_cap), key="bot_def_gu_b")
+        bot_heal_b = st.slider("Bot Healing Gu", 0, bot_cap, 0, key="bot_heal_b")
+        bot_agi_gu_b = st.slider("Bot Agility Gu", 0, bot_cap, 0, key="bot_agi_gu_b")
+
+        if (bot_att + bot_def_gu_b + bot_heal_b + bot_agi_gu_b) > bot_cap:
+            st.warning(f"Bot Total Gu ({bot_att + bot_def_gu_b + bot_heal_b + bot_agi_gu_b}) exceeds Bot Rank limit of {bot_cap}!")
         
         if st.button("Battle AI Bot", type="primary"):
             if b_total_stats > b_max_pool:
-                st.error("Cannot start: Stat allocation exceeds rank pool limit!")
+                st.error("Cannot start: Your stat allocation exceeds rank pool limit!")
             elif (b_att + b_def_gu + b_heal + b_agi_gu) > b_cap:
-                st.error("Cannot start: Gu count exceeds your rank limit!")
+                st.error("Cannot start: Your Gu count exceeds your rank limit!")
+            elif bot_total_stats > bot_max_pool:
+                st.error("Cannot start: Bot stat allocation exceeds rank pool limit!")
+            elif (bot_att + bot_def_gu_b + bot_heal_b + bot_agi_gu_b) > bot_cap:
+                st.error("Cannot start: Bot Gu count exceeds bot rank limit!")
             else:
-                bot_rank = b_rank
-                bot_cap = max_cap_map.get(bot_rank, 2)
                 p1_max_hp = b_def * 10.0
                 p1_max_thoughts = 1 + (b_int // 20)
                 
-                bot_def = b_def
-                bot_int = b_int
-                bot_pwr = b_pwr
-                bot_agi = b_agi
                 bot_max_hp = bot_def * 10.0
                 bot_max_thoughts = 1 + (bot_int // 20)
 
@@ -273,7 +298,7 @@ if not st.session_state.in_room:
                     "p1_gu": {"Attack Gu": b_att, "Defense Gu": b_def_gu, "Healing Gu": b_heal, "Agility Gu": b_agi_gu},
                     "p1_shield": 0,
                     "p1_actions": [],
-                    "p2_name": "Shadow Sect AI",
+                    "p2_name": bot_name,
                     "p2_rank": bot_rank,
                     "p2_apt": "A-Grade",
                     "p2_pwr": bot_pwr,
@@ -285,7 +310,7 @@ if not st.session_state.in_room:
                     "p2_essence": 100.0,
                     "p2_thoughts": bot_max_thoughts,
                     "p2_max_thoughts": bot_max_thoughts,
-                    "p2_gu": {"Attack Gu": bot_cap // 2, "Defense Gu": bot_cap - (bot_cap // 2), "Healing Gu": 0, "Agility Gu": 0},
+                    "p2_gu": {"Attack Gu": bot_att, "Defense Gu": bot_def_gu_b, "Healing Gu": bot_heal_b, "Agility Gu": bot_agi_gu_b},
                     "p2_shield": 0,
                     "p2_actions": [],
                     "turn": 1,
@@ -472,7 +497,6 @@ else:
         # Build action queue tuples: (speed_value, actor_prefix, action_type, original_index)
         all_action_queue = []
         for idx, act in enumerate(p1_actions):
-            # Base speed = AGI + bonus from agility actions (+1 speed per AGI stat)
             act_speed = p1_agi_stat + (5 if act == 'agility' else 0)
             all_action_queue.append({
                 'actor': 'p1',
@@ -514,7 +538,6 @@ else:
             def_stat = room.get(f"{actor}_def", 0)
             
             if action == 'defense':
-                # +1.5 Flat Shield Power & +1.0% Shield Bonus per point of DEF
                 base_shield = 30.0 * rank
                 shield_val = base_shield + (def_stat * 1.5) * (1.0 + (def_stat * 0.01))
                 room[f"{actor}_shield"] += shield_val
@@ -536,7 +559,6 @@ else:
                 else: p2_summaries.append(msg)
                 
             elif action == 'attack':
-                # Accuracy & Evasion: 15% base miss, modified by defender AGI (+1% evasion per AGI, max 50%)
                 evasion_chance = min(50.0, target_agi)
                 hit_chance = max(50.0, 85.0 + agi - evasion_chance)
                 
@@ -545,13 +567,11 @@ else:
                     if actor == 'p1': p1_summaries.append(msg)
                     else: p2_summaries.append(msg)
                 else:
-                    # PWR bonuses: +1.0 Flat Physical Attack Power & +1.0% Damage Bonus per point, +1.0% Crit Dmg per point
                     base_dmg = (20.0 * rank) + pwr
                     dmg_mult = 1.0 + (pwr * 0.01)
                     final_raw_dmg = base_dmg * dmg_mult
                     
-                    # Crit check (using critical damage bonus from PWR)
-                    crit_chance = 10.0 # base 10%
+                    crit_chance = 10.0
                     is_crit = random.uniform(0, 100) < crit_chance
                     if is_crit:
                         crit_dmg_mult = 1.5 + (pwr * 0.01)
@@ -596,12 +616,11 @@ else:
             apt = room[f"{p}_apt"]
             int_stat = room.get(f"{p}_int", 0)
             base_regen = aptitude_recovery_map.get(apt, 12.0)
-            # INT multiplier: +1.0% multiplicative Essence Regen multiplier per point
             essence_regen = base_regen * (1.0 + (int_stat * 0.01))
             room[f"{p}_essence"] = min(100.0, room[f"{p}_essence"] + essence_regen)
             
             rank = room[f"{p}_rank"]
-            base_thought_regen = rank_max_thoughts.get(rank, 1)
+            base_thought_regen = rank_max_thoughts.get(rank, 1) if 'rank_max_thoughts' in globals() else 1
             bonus_thought_regen = int_stat // 50
             total_thought_regen = base_thought_regen + bonus_thought_regen
             
